@@ -2,7 +2,7 @@
 """Create a "virtual" Python installation
 """
 
-# If you change the version here, change it in setup.py 
+# If you change the version here, change it in setup.py
 # and docs/conf.py as well.
 virtualenv_version = "1.6.1"
 
@@ -532,7 +532,7 @@ def _install_req(py_executable, unzip=False, distribute=False,
                              "and --never-download is set.  Either re-run virtualenv "
                              "without the --never-download option, or place a %s "
                              "distribution (%s) in one of these "
-                             "locations: %r" % (project_name, project_name, 
+                             "locations: %r" % (project_name, project_name,
                                                 setup_fn or source,
                                                 search_dirs))
                 sys.exit(1)
@@ -585,16 +585,16 @@ def file_search_dirs():
 
 def install_setuptools(py_executable, unzip=False,
                        search_dirs=None, never_download=False):
-    _install_req(py_executable, unzip, 
+    _install_req(py_executable, unzip,
                  search_dirs=search_dirs, never_download=never_download)
 
-def install_distribute(py_executable, unzip=False, 
+def install_distribute(py_executable, unzip=False,
                        search_dirs=None, never_download=False):
-    _install_req(py_executable, unzip, distribute=True, 
+    _install_req(py_executable, unzip, distribute=True,
                  search_dirs=search_dirs, never_download=never_download)
 
 _pip_re = re.compile(r'^pip-.*(zip|tar.gz|tar.bz2|tgz|tbz)$', re.I)
-def install_pip(py_executable, search_dirs=None, never_download=False):    
+def install_pip(py_executable, search_dirs=None, never_download=False):
     if search_dirs is None:
         search_dirs = file_search_dirs()
 
@@ -736,6 +736,13 @@ def main():
         dest='prompt',
         help='Provides an alternative prompt prefix for this environment')
 
+    parser.add_option(
+        '--distutilscfg=',
+        dest='distutilscfg',
+        default=os.environ.get('VENV_DISTUTILSCFG', ''),
+        help='Specify a path to the disutils.cfg which will be copied '
+                'for use in this environment')
+
     if 'extend_parser' in globals():
         extend_parser(parser)
 
@@ -793,7 +800,8 @@ def main():
                        use_distribute=options.use_distribute or majver > 2,
                        prompt=options.prompt,
                        search_dirs=options.search_dirs,
-                       never_download=options.never_download)
+                       never_download=options.never_download,
+                       distutilscfg_path=options.distutilscfg)
     if 'after_install' in globals():
         after_install(options, home_dir)
 
@@ -870,7 +878,8 @@ def call_subprocess(cmd, show_stdout=True,
 
 def create_environment(home_dir, site_packages=True, clear=False,
                        unzip_setuptools=False, use_distribute=False,
-                       prompt=None, search_dirs=None, never_download=False):
+                       prompt=None, search_dirs=None, never_download=False,
+                       distutilscfg_path=None):
     """
     Creates a new environment in ``home_dir``.
 
@@ -886,13 +895,13 @@ def create_environment(home_dir, site_packages=True, clear=False,
         home_dir, lib_dir, inc_dir, bin_dir,
         site_packages=site_packages, clear=clear))
 
-    install_distutils(home_dir)
+    install_distutils(home_dir, distutilscfg_path)
 
     if use_distribute or os.environ.get('VIRTUALENV_USE_DISTRIBUTE'):
-        install_distribute(py_executable, unzip=unzip_setuptools, 
+        install_distribute(py_executable, unzip=unzip_setuptools,
                            search_dirs=search_dirs, never_download=never_download)
     else:
-        install_setuptools(py_executable, unzip=unzip_setuptools, 
+        install_setuptools(py_executable, unzip=unzip_setuptools,
                            search_dirs=search_dirs, never_download=never_download)
 
     install_pip(py_executable, search_dirs=search_dirs, never_download=never_download)
@@ -1242,7 +1251,7 @@ def install_activate(home_dir, bin_dir, prompt=None):
         content = content.replace('__BIN_NAME__', os.path.basename(bin_dir))
         writefile(os.path.join(bin_dir, name), content)
 
-def install_distutils(home_dir):
+def install_distutils(home_dir, distutilscfg_path):
     distutils_path = change_prefix(distutils.__path__[0], home_dir)
     mkdir(distutils_path)
     ## FIXME: maybe this prefix setting should only be put in place if
@@ -1251,7 +1260,15 @@ def install_distutils(home_dir):
     ## FIXME: this is breaking things, removing for now:
     #distutils_cfg = DISTUTILS_CFG + "\n[install]\nprefix=%s\n" % home_dir
     writefile(os.path.join(distutils_path, '__init__.py'), DISTUTILS_INIT)
-    writefile(os.path.join(distutils_path, 'distutils.cfg'), DISTUTILS_CFG, overwrite=False)
+    venv_dutilscfg_path = os.path.join(distutils_path, 'distutils.cfg')
+    if distutilscfg_path and os.path.exists(distutilscfg_path):
+        logger.info('Creating distutils.cfg from: %s', distutilscfg_path)
+        fh = open(distutilscfg_path, 'rb')
+        fcontent = fh.read()
+        fh.close()
+        writefile(venv_dutilscfg_path, fcontent, overwrite=False)
+    else:
+        writefile(venv_dutilscfg_path, DISTUTILS_CFG, overwrite=False)
 
 def fix_lib64(lib_dir):
     """
@@ -1509,7 +1526,7 @@ def create_bootstrap_script(extra_text, python_version=''):
 def convert(s):
     b = base64.b64decode(s.encode('ascii'))
     return zlib.decompress(b).decode('utf-8')
-    
+
 ##file site.py
 SITE_PY = convert("""
 eJzVPP1z2zaWv/OvwMqTIZXKdD66nR2n7o2TOK3v3MTbpLO5dT06SoIk1hTJEqQV7c3d337vAwAB
